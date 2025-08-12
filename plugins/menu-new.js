@@ -51,7 +51,7 @@ cmd({
                 return await conn.sendMessage(
                     from,
                     {
-                        video: { url: config.MENU_VIDEO_URL || 'https://files.catbox.moe/wzdxwt.mp4' },
+                        image: { url: config.MENU_IMAGE_URL || 'https://files.catbox.moe/yj7zp0.png' },
                         caption: menuCaption,
                         contextInfo: contextInfo
                     },
