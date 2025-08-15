@@ -80,4 +80,7 @@ ANTI_VV: process.env.ANTI_VV || "true",
 // true for anti once view 
 AUTO_RECORDING: process.env.AUTO_RECORDING || "false"
 // make it true for auto recoding 
+WEBFLOW_API: "https://your-backend-link.com/flow",
+COOLDOWN_TIME: 60000, // 1 min
+MAX_RETRIES: 5
 };
