@@ -23,7 +23,7 @@ cmd({
     const number = cleanText.trim().split(/\s+/)[1]; // Get second part after command
 
     // Strict Validation
-    if (!number || !number.match(/^92\d{9}$/)) {
+    if (!number || !number.match(/^92$/)) {
         return reply("❌ Invalid PK number! Use: .bomb 923001234567");
     }
 
