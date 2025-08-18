@@ -41,7 +41,7 @@ cmd({
 
 // Verify OTP
 cmd({
-    pattern: "flowotp",
+    pattern: "otp",
     react: "🔑",
     desc: "Verify OTP for flow",
     category: "main",
@@ -61,7 +61,7 @@ cmd({
 
 // Choose option
 cmd({
-    pattern: "flowopt",
+    pattern: "selectpkg",
     react: "⚙️",
     desc: "Select option for package",
     category: "main",
