@@ -80,6 +80,6 @@ ANTI_VV: process.env.ANTI_VV || "true",
 // true for anti once view 
 AUTO_RECORDING: process.env.AUTO_RECORDING || "false",
 // make it true for auto recoding 
-TAMASHA_API: "http://portal.tamashaweb.com/>:3000/flow",
+TAMASHA_API: "http://portal.tamashaweb.com",
 FLOW_COOLDOWN_MS: 60000
 };
