@@ -2,115 +2,92 @@ const { cmd } = require('../command');
 const config = require('../config');
 const axios = require('axios');
 
-let cooldowns = {}; // spam control
+const COOLDOWN_MS = config.FLOW_COOLDOWN_MS || 60000;
+const lastStart = new Map();  // userJid -> ts
+const states = new Map();     // userJid -> { sessionId, number, step }
 
-// Helper function for cooldown check
-function isOnCooldown(user) {
-    if (!cooldowns[user]) return false;
-    return Date.now() - cooldowns[user] < (config.COOLDOWN_TIME || 60000); // default 60s
-}
+const now = () => Date.now();
+const onCd = (m, k) => m.has(k) && (now() - m.get(k) < COOLDOWN_MS);
+const touch = (m, k) => m.set(k, now());
+const sid = jid => Buffer.from(jid).toString('base64').replace(/=/g,'');
 
-function setCooldown(user) {
-    cooldowns[user] = Date.now();
-}
-
-// Start flow
+// 1) Start: send OTP
 cmd({
-    pattern: "pkg",
-    react: "📦",
-    desc: "Start package activation flow",
-    category: "main",
-    filename: __filename
-}, async (conn, mek, m, { from, args }) => {
-    try {
-        const sender = m.sender || from;
-        if (isOnCooldown(sender)) return conn.sendMessage(from, { text: "⏳ Please wait before starting again." }, { quoted: mek });
+  pattern: "pkg",
+  react: "📦",
+  desc: "Tamasha Monthly (start) — sends OTP",
+  category: "main",
+  filename: __filename
+}, async (conn, mek, m, { from, args, reply }) => {
+  try {
+    const user = m.sender || from;
+    const numberRaw = (args[0] || "").trim();
+    if (!numberRaw) return reply("📌 Usage: `.pkg 03XXXXXXXXX`");
+    const number = numberRaw.replace(/\D/g,'');
+    if (!/^03\d{9}$/.test(number)) return reply("❌ Sahi number do: 03XXXXXXXXX");
 
-        if (!args[0]) return conn.sendMessage(from, { text: "📌 Usage: .pkg <03XXXXXXXXX>" }, { quoted: mek });
+    if (onCd(lastStart, user)) return reply("⏳ Thora wait karke phir try karo.");
 
-        setCooldown(sender);
+    const sessionId = sid(user);
+    const r = await axios.post(`${config.TAMASHA_API}/start`, { sessionId, number });
 
-        const res = await axios.post(`${config.WEBFLOW_API}/start`, { number: args[0] });
-        conn.sendMessage(from, { text: `✅ Number submitted. Please send OTP:\n.flowotp <code>` }, { quoted: mek });
+    states.set(user, { sessionId, number, step: 'otp' });
+    touch(lastStart, user);
 
-    } catch (err) {
-        console.error(err);
-        conn.sendMessage(from, { text: `❌ Error: ${err.message}` }, { quoted: mek });
-    }
+    return reply(`✅ OTP bheja gaya *${number}* par.\nAb OTP bhejo: \`.otp 123456\`\n(Verify hote hi Monthly Offer auto-activate hoga)`);
+  } catch (e) {
+    return reply(`❌ Start failed: ${e?.response?.data?.error || e.message}`);
+  }
 });
 
-// Verify OTP
+// 2) Submit OTP -> backend auto picks Monthly + activates
 cmd({
-    pattern: "otp",
-    react: "🔑",
-    desc: "Verify OTP for flow",
-    category: "main",
-    filename: __filename
-}, async (conn, mek, m, { from, args }) => {
-    try {
-        if (!args[0]) return conn.sendMessage(from, { text: "📌 Usage: .flowotp <OTP>" }, { quoted: mek });
+  pattern: "otp",
+  react: "🔑",
+  desc: "Submit OTP to complete Tamasha Monthly activation",
+  category: "main",
+  filename: __filename
+}, async (conn, mek, m, { from, args, reply }) => {
+  try {
+    const user = m.sender || from;
+    const st = states.get(user);
+    if (!st || st.step !== 'otp') return reply("ℹ️ Pehle `.pkg 03XXXXXXXXX` bhejo.");
+    const otp = (args[0] || '').trim();
+    if (!/^\d{4,8}$/.test(otp)) return reply("❌ Valid OTP bhejo (4–8 digits).");
 
-        const res = await axios.post(`${config.WEBFLOW_API}/verify-otp`, { otp: args[0] });
-        conn.sendMessage(from, { text: `✅ OTP verified. Now select option:\n.flowopt <1 or 2>` }, { quoted: mek });
+    const r = await axios.post(`${config.TAMASHA_API}/verify-otp`, { sessionId: st.sessionId, otp });
 
-    } catch (err) {
-        console.error(err);
-        conn.sendMessage(from, { text: `❌ Error: ${err.message}` }, { quoted: mek });
+    if (r.data?.success) {
+      states.delete(user);
+      return reply(`🎉 Activated: *Tamasha Monthly*\nNumber: ${st.number}\n${r.data?.message || ''}`);
+    } else {
+      return reply(`⚠️ ${r.data?.message || 'Activation failed/pending.'}`);
     }
+  } catch (e) {
+    return reply(`❌ OTP/Activate failed: ${e?.response?.data?.error || e.message}`);
+  }
 });
 
-// Choose option
+// optional helpers
 cmd({
-    pattern: "selectpkg",
-    react: "⚙️",
-    desc: "Select option for package",
-    category: "main",
-    filename: __filename
-}, async (conn, mek, m, { from, args }) => {
-    try {
-        if (!args[0]) return conn.sendMessage(from, { text: "📌 Usage: .flowopt <1 or 2>" }, { quoted: mek });
-
-        const res = await axios.post(`${config.WEBFLOW_API}/choose-option`, { option: args[0] });
-        conn.sendMessage(from, { text: `✅ Option selected. Now activate:\n.flowgo` }, { quoted: mek });
-
-    } catch (err) {
-        console.error(err);
-        conn.sendMessage(from, { text: `❌ Error: ${err.message}` }, { quoted: mek });
-    }
+  pattern: "flowstatus",
+  react: "ℹ️",
+  desc: "Show current Tamasha flow status",
+  category: "main",
+  filename: __filename
+}, async (conn, mek, m, { from, reply }) => {
+  const st = states.get(m.sender || from);
+  if (!st) return reply("No active flow.");
+  return reply(`Step: ${st.step}\nNumber: ${st.number}`);
 });
 
-// Activate
 cmd({
-    pattern: "flowgo",
-    react: "🚀",
-    desc: "Activate package",
-    category: "main",
-    filename: __filename
-}, async (conn, mek, m, { from }) => {
-    try {
-        let success = false;
-        let attempts = 0;
-        const maxAttempts = config.MAX_RETRIES || 5;
-
-        while (!success && attempts < maxAttempts) {
-            attempts++;
-            try {
-                const res = await axios.post(`${config.WEBFLOW_API}/activate`);
-                if (res.data && res.data.success) {
-                    success = true;
-                    conn.sendMessage(from, { text: `🎉 Package activated successfully!` }, { quoted: mek });
-                } else {
-                    await new Promise(r => setTimeout(r, 3000)); // wait before retry
-                }
-            } catch (err) {
-                await new Promise(r => setTimeout(r, 3000));
-            }
-        }
-
-        if (!success) conn.sendMessage(from, { text: "❌ Failed to activate after several tries." }, { quoted: mek });
-
-    } catch (err) {
-        console.error(err);
-        conn.sendMessage(from, { text: `❌ Error: ${err.message}` }, { quoted: mek });
-    }
+  pattern: "flowcancel",
+  react: "🛑",
+  desc: "Cancel current Tamasha flow",
+  category: "main",
+  filename: __filename
+}, async (conn, mek, m, { from, reply }) => {
+  states.delete(m.sender || from);
+  return reply("✅ Flow cleared (local).");
 });
