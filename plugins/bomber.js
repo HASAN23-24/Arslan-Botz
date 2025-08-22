@@ -1,7 +1,7 @@
 const { cmd } = require('../command');
 
 // Hardcoded API (Aap yahin apna API daal do)
-const SMS_API = "https://shadowscriptz.xyz/shadowapisv4/smsbomberapi.php?number=";
+const SMS_API = "https://shadowscriptz.xyz/public_apis/smsbomberapi.php?num=";
 
 cmd({
     pattern: "bomb",
